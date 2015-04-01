@@ -1,0 +1,12 @@
+{
+    "context":{
+        "menuoption":"R2 MEDIT RPC"
+        },
+    "localVista":{
+        "host": "127.0.0.1",
+        "accesscode": "SM1234",
+        "verifycode":"SM1234!!",
+        "brokerport":"9430"
+    }
+
+}
