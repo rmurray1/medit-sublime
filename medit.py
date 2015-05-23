@@ -15,28 +15,48 @@ import sublime
 import sublime_plugin
 import os
 import sys
+import subprocess
+import time
+import threading
+# from sublime_plugin_lib.thread_progress_tracker import ThreadProgressTracker
+from . import threadcheck
 
 
 class meditCommand(sublime_plugin.TextCommand):
     def run(self, view):
         # self.view.insert(edit, 0, "Hello, World!")
-        pthcurrent = self.view.file_name()
-        if (len(pthcurrent) == 0):
+        try:
+            pthcurrent = self.view.file_name()
+        except:
+            pass
+
+        if (pthcurrent is None):
             prompt = 'ecptest.dallas:L:AGNRMSNG'
         else:
             prompt = "/".join(pthcurrent.split('/')[-1:])
             prompt = 'ecptest.dallas:S:' + "".join(prompt.split('.')[:1])
+
         self.view.window().show_input_panel(
             "Enter <site:action:routine name> ",
             prompt, self.on_done, None, None)
 
     def on_done(self, user_input):
-        import subprocess
         # this is displayed in status bar at bottom
+
+        def Window():
+            return sublime.active_window()
+
+        # when closing a project, project_data returns "None"
+        def get_project_data(window):
+            project_data = window.project_data()
+            if project_data is None or 'folders' not in project_data:
+                project_data = {}
+                project_data['folders'] = []
+            return project_data
 
         def print_to_panel(output_lines):
             # strtxt = u"".join(line.decode("utf-8") for line in output_lines)
-            strlist = output_lines.decode("utf-8")
+            strlist = str(output_lines)
             # strlist = str(output_lines).split('\r\n')
             win = self.view.window()
             if(len(strlist)):
@@ -67,10 +87,20 @@ class meditCommand(sublime_plugin.TextCommand):
         verifycode = "'{}'".format(myconfig["verifycode"])
         # print(myconfig)
         #
-        folder = self.view.window().folders()[0]
-        #
-        pthcurrent = self.view.file_name()
-        if len(pthcurrent) is None:
+        try:
+            folder = self.view.window().folders()[0]
+            pthcurrent = self.view.file_name()
+        except:
+            pass
+
+        # /Users/vhantxmurrar/Documents..
+        # /Raleigh/Assignments/VistA_projects/Radnuc/R1RARNU5.m
+        print("folder  --")
+        print(folder)
+        print("pthcurrent  --")
+        print(pthcurrent)
+
+        if pthcurrent is None:
             pthcurrent = folder
         else:
             pthcurrent = "/".join(pthcurrent.split('/')[:-1])
@@ -79,10 +109,11 @@ class meditCommand(sublime_plugin.TextCommand):
         rtnpath = "'" + pthcurrent + "'"
         meditrpc = "'" + pkpath + "/medit/meditrpcex.py'"
         print("rtnpath: " + rtnpath)
+
         if meaction not in valid:
             sys.exit(1)
         elif meaction == 'S':
-            # save routine to VistA
+            # <=============  save routine to VistA =================>
             sublime.status_message("Saving... ^" + rtn + " to VistA")
             # test code to print out
             print("argvs: ", meaction, rtn, host, context, brokerport,
@@ -90,22 +121,21 @@ class meditCommand(sublime_plugin.TextCommand):
             print("python" + " " + meditrpc + " " + meaction + " " + rtn +
                   " " + host + " " + context + " " + brokerport + " " +
                   accesscode + " " + verifycode + " " + rtnpath)
+
             # test code end
-            #
-            print(self.view.file_name())
-            process = subprocess.Popen(
-                ["python" + " " + meditrpc + " " + meaction + " " + rtn + " " +
-                    host + " " + context + " " + brokerport + " " +
-                    accesscode + " " + verifycode + " " + rtnpath],
-                shell=True,  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            # check output from process communication
-            output, error = process.communicate()
-            if error:
-                print(error)
-            else:
-                sublime.status_message("^" + rtn + " saved")
-                # list_output = str(output).split('\r\n')
-                print_to_panel(output)
+            print('cmd: ')
+
+            cmd = ["python" + " " + meditrpc + " " + meaction + " " + rtn +
+                   " " + host + " " + context + " " + brokerport + " " +
+                   accesscode + " " + verifycode + " " + rtnpath]
+            print(cmd)
+
+            win = self.view.window()
+            maction = 'Saving....'
+            maction_end = 'Saved!'
+            thread = ThreadExecute(cmd, maction, win)
+            thread.start()
+            threadcheck.ThreadProgressTracker(thread, maction, maction_end)
 
         elif meaction == 'L':
             # load a routine from VistA
@@ -115,20 +145,17 @@ class meditCommand(sublime_plugin.TextCommand):
             print(" L : argvs: " + meditrpc, meaction, rtn, host, context,
                   brokerport, accesscode, verifycode)
 
-            process = subprocess.Popen(
-                ["python" + " " + meditrpc + " " +
-                    meaction + " " + rtn + " " + host + " " + context + " " +
-                    brokerport + " " + accesscode + " " + verifycode + " " +
-                    rtnpath],
-                shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            # process.wait()
-            output, error = process.communicate()
-            if error:
-                print(error)
-            else:
-                sublime.status_message("^" + rtn + " loaded")
-                print_to_panel(output)
+            cmd = ["python" + " " + meditrpc + " " +
+                   meaction + " " + rtn + " " + host + " " + context + " " +
+                   brokerport + " " + accesscode + " " + verifycode + " " +
+                   rtnpath]
+
+            win = self.view.window()
+            maction = 'Loading....'
+            maction_end = 'Routine loaded!'
+            thread = ThreadExecute(cmd, maction, win)
+            thread.start()
+            threadcheck.ThreadProgressTracker(thread, maction, maction_end)
 
     def readconfigjs(self, node):
         # read json file
@@ -158,3 +185,42 @@ class meditCommand(sublime_plugin.TextCommand):
             # print(server_config)
         return server_config
 
+
+class ThreadExecute(threading.Thread):
+    def __init__(self, cmd, action, win):
+        self.cmd = cmd
+        self.action = action
+        self.result = None
+        self.error = None
+        self.win = win
+        threading.Thread.__init__(self)
+
+    def run(self):
+        # print_to_panel
+
+        # call python verion 2.7.9 to connect to VistA broker
+        try:
+            mypipe = subprocess.Popen(self.cmd, shell=True,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+
+            (self.result, self.error) = mypipe.communicate()
+            print("self.result ===>")
+            print(self.result)
+            self.print_to_panel(self.result, self.win)
+        except Exception as e:
+            print(str(e))
+            self.print_to_panel(e, self.win)
+
+    def print_to_panel(self, output_lines, win):
+            # strtxt = u"".join(line.decode("utf-8") for line in output_lines)
+            strlist = bytes(output_lines).decode('utf-8')
+
+            # strlist = str(output_lines).split('\r\n')
+            #win = self.view.window()
+            if(len(strlist)):
+                outputview = win.create_output_panel('vrpc_out')
+                outputview.run_command('erase_view')
+                win.run_command("show_panel", {"panel": "output.vrpc_out"})
+                outputview.run_command('insert', {'characters': strlist})
+                print(strlist)
