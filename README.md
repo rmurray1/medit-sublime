@@ -9,6 +9,14 @@ to seemlessly call connect from python3.
 2. I am reading the sublime active window, so I'll need to change it to ask 
 for the file name without reading the sublime active window name.
 
+=======
+   python2.7. I'll need to switch to new version of the RPCBroker in order 
+   to seemlessly call connect from python3.
+
+2. I am reading the sublime active window, so I'll need to change it to ask 
+   for the file name without reading the sublime active window name.
+
+>>>>>>> origin/master
 Functionality:
 1. Add a VistA menu option with Joel Ivy's Eclipse Editor RPCs and update medit configuration
 
@@ -17,3 +25,9 @@ Functionality:
 
 3. A Sublime Event Listener for on_pre_save and on_modified was added in order 
 to update a modified '.m' routine date and time.
+=======
+    { "keys": ["ctrl+m"], "command": "medit" },
+
+3. A Sublime Event Listener for on_pre_save and on_modified was added in order 
+   to update a modified '.m' routine date and time.
+>>>>>>> origin/master
