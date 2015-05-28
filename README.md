@@ -10,7 +10,7 @@ Current issues:
    for the file name without reading the sublime active window name.
 
 Functionality:
-1. Add a VistA menu option with Joel Ivy's Eclipse Editor RPCs and update meditt configuration
+1. Add a VistA menu option with Joel Ivy's Eclipse Editor RPCs and update medit configuration
 
 2. There is a key binding provided
     { "keys": ["ctrl+m"], "command": "medit" },
