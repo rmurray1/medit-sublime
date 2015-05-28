@@ -16,15 +16,60 @@ import sublime_plugin
 import os
 import sys
 import subprocess
-import time
+import datetime
 import threading
 # from sublime_plugin_lib.thread_progress_tracker import ThreadProgressTracker
 from . import threadcheck
 
 
+class PreInsertDateTime(sublime_plugin.EventListener):
+    is_modified = False
+
+    def on_pre_save_async(self, view):
+        file_name = view.file_name()
+        # print(view.file_name(), "is about to be saved")
+        # should be .m
+        mExt = file_name[-2:]
+        #print(file_name[-2:])
+        if (mExt == '.m' and self.is_modified):
+            view.run_command('insert_date_timeb')
+
+    def on_modified_async(self, view):
+        self.is_modified = True
+
+
+class InsertDateTimebCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+
+        # add this to insert at current cursor position
+        # http://www.sublimetext.com/forum/viewtopic.php?f=6&t=11509
+        region = sublime.Region(0, 0)
+
+        lines_num = self.view.line(region)
+
+        first_line = self.view.substr(lines_num)
+
+        if first_line is not None:
+            temp_first_line = first_line.split(';')
+            mynow = datetime.datetime.now().strftime("%m/%d/%y %H:%M")
+            temp_first_line[2] = mynow
+            clean_line = []
+            for x in temp_first_line:
+                clean_line.append(x.strip())
+
+            new_first_line = '; '.join(clean_line)
+
+            self.view.replace(edit, lines_num, new_first_line)
+            print("first line")
+            print(first_line)
+            print("temp_first_line")
+            print(temp_first_line)
+
+
 class meditCommand(sublime_plugin.TextCommand):
-    def run(self, view):
+    def run(self, edit):
         # self.view.insert(edit, 0, "Hello, World!")
+        self.edit = edit
         try:
             pthcurrent = self.view.file_name()
         except:
@@ -36,9 +81,10 @@ class meditCommand(sublime_plugin.TextCommand):
             prompt = "/".join(pthcurrent.split('/')[-1:])
             prompt = 'ecptest.dallas:S:' + "".join(prompt.split('.')[:1])
 
-        self.view.window().show_input_panel(
-            "Enter <site:action:routine name> ",
-            prompt, self.on_done, None, None)
+        win = self.view.window()
+
+        win.show_input_panel("Enter <site:action:routine name> ",
+                             prompt, self.on_done, None, None)
 
     def on_done(self, user_input):
         # this is displayed in status bar at bottom
@@ -53,18 +99,6 @@ class meditCommand(sublime_plugin.TextCommand):
                 project_data = {}
                 project_data['folders'] = []
             return project_data
-
-        def print_to_panel(output_lines):
-            # strtxt = u"".join(line.decode("utf-8") for line in output_lines)
-            strlist = str(output_lines)
-            # strlist = str(output_lines).split('\r\n')
-            win = self.view.window()
-            if(len(strlist)):
-                outputview = win.create_output_panel('vrpc_out')
-                outputview.run_command('erase_view')
-                win.run_command("show_panel", {"panel": "output.vrpc_out"})
-                outputview.run_command('insert', {'characters': strlist})
-                print(strlist)
 
         valid = ['S', 'L']
         data = str(user_input).split(':')
@@ -113,9 +147,11 @@ class meditCommand(sublime_plugin.TextCommand):
         if meaction not in valid:
             sys.exit(1)
         elif meaction == 'S':
+            #
             # <=============  save routine to VistA =================>
             sublime.status_message("Saving... ^" + rtn + " to VistA")
             # test code to print out
+            '''
             print("argvs: ", meaction, rtn, host, context, brokerport,
                   accesscode, verifycode)
             print("python" + " " + meditrpc + " " + meaction + " " + rtn +
@@ -124,7 +160,7 @@ class meditCommand(sublime_plugin.TextCommand):
 
             # test code end
             print('cmd: ')
-
+            '''
             cmd = ["python" + " " + meditrpc + " " + meaction + " " + rtn +
                    " " + host + " " + context + " " + brokerport + " " +
                    accesscode + " " + verifycode + " " + rtnpath]
@@ -224,3 +260,4 @@ class ThreadExecute(threading.Thread):
                 win.run_command("show_panel", {"panel": "output.vrpc_out"})
                 outputview.run_command('insert', {'characters': strlist})
                 print(strlist)
+
