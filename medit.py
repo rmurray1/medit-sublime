@@ -57,7 +57,7 @@ class InsertDateTimebCommand(sublime_plugin.TextCommand):
             for x in temp_first_line:
                 clean_line.append(x.strip())
 
-            new_first_line = '; '.join(clean_line)
+            new_first_line = clean_line[0] + ' ; ' + clean_line[1] + ' ; ' + clean_line[2]
 
             self.view.replace(edit, lines_num, new_first_line)
             print("first line")
