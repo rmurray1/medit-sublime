@@ -18,8 +18,7 @@ import sys
 import subprocess
 import datetime
 import threading
-# from sublime_plugin_lib.thread_progress_tracker import ThreadProgressTracker
-from . import threadcheck
+from .threadcheck import ThreadProgressTracker
 
 
 class PreInsertDateTime(sublime_plugin.EventListener):
@@ -49,40 +48,131 @@ class InsertDateTimebCommand(sublime_plugin.TextCommand):
 
         first_line = self.view.substr(lines_num)
 
-        if first_line is not None:
-            temp_first_line = first_line.split(';')
-            mynow = datetime.datetime.now().strftime("%m/%d/%y %H:%M")
-            temp_first_line[2] = mynow
-            clean_line = []
-            for x in temp_first_line:
-                clean_line.append(x.strip())
+        if (first_line is not None):
+            if (first_line.find(";") != -1):
+                temp_first_line = first_line.split(';')
+                mynow = datetime.datetime.now().strftime("%m/%d/%y %H:%M")
+                temp_first_line[2] = mynow
+                clean_line = []
+                for x in temp_first_line:
+                    clean_line.append(x.strip())
 
-            new_first_line = clean_line[0] + ' ; ' + clean_line[1] + ' ; ' + clean_line[2]
+                new_first_line = clean_line[0] + ' ;' + clean_line[1] + ' ;' + clean_line[2]
 
-            self.view.replace(edit, lines_num, new_first_line)
-            print("first line")
-            print(first_line)
-            print("temp_first_line")
-            print(temp_first_line)
+                self.view.replace(edit, lines_num, new_first_line)
+                '''
+                print("first line")
+                print(first_line)
+                print("temp_first_line")
+                print(temp_first_line)
+                '''
 
 
 class meditCommand(sublime_plugin.TextCommand):
+    pthcurrent = None
+    servers = None
+    selserver = None
+    selaction = None
+    actions = None
+
+    @staticmethod
+    def readjson():
+        # read json file
+        import json
+        # cfpath = os.getcwd()
+        pkpath = sublime.packages_path()
+        brokersettings = pkpath + "/medit/medit.default-config.json"
+        # test print code
+        hostnames = []
+        '''
+        print('broker:' + brokersettings)
+        print("pkpath: " + pkpath)
+        '''
+        mydata = '0'
+        if os.path.exists(pkpath):
+            # Grab the data
+            # print('before the try')
+            my_data = json.loads(open(brokersettings).read())
+            # print(my_data)
+            for key in my_data.keys():
+                #print(key)
+                hostnames.append(key)
+        return hostnames
+
     def run(self, edit):
         # self.view.insert(edit, 0, "Hello, World!")
         self.edit = edit
+        self.actions = ['Load', 'Save']
         try:
-            pthcurrent = self.view.file_name()
+            self.pthcurrent = self.view.file_name()
         except:
             pass
 
-        if (pthcurrent is None):
-            prompt = 'ecptest.dallas:L:AGNRMSNG'
-        else:
-            prompt = "/".join(pthcurrent.split('/')[-1:])
-            prompt = 'ecptest.dallas:S:' + "".join(prompt.split('.')[:1])
+        self.servers = self.readjson()
+        '''
+        print("servers")
+        print(self.servers)
+        '''
+
+        if self.servers is None:
+            return
+        self.getserver()
+
+    def getserver(self):
+        win = self.view.window()
+        win.show_quick_panel(self.servers, self.actserver)
+
+    def actserver(self, idx):
+        self.selserver = self.servers[idx]
+        '''
+        print('self.selserver')
+        print(self.selserver)
+        '''
+        self.getaction()
+
+    def getaction(self):
 
         win = self.view.window()
+        win.show_quick_panel(self.actions, self.actaction)
 
+    def actaction(self, idx):
+        self.selaction = self.actions[idx][0]
+        '''
+        print('self.selaction')
+        print(self.selaction)
+        '''
+        if (self.selaction is None) or (self.selserver is None):
+            return
+
+        prompt =  self.selserver + ':' + self.selaction
+        '''
+        print('my prompt:')
+        print(prompt)
+        '''
+        if (self.pthcurrent is None):
+            prompt = prompt + ':ROUTINE'
+
+        if (self.pthcurrent is not None):
+            #filenmpt = "/".join(self.pthcurrent.split('/')[-1:])
+            #filenm =  "".join(filenmpt.split('.')[:1])
+            fileName,fileExtension = os.path.splitext(self.pthcurrent)
+            filenm = "/".join(fileName.split('/')[-1:])
+
+            '''
+            print('filenm')
+            print(filenm)
+            print("fileName",fileName)
+            print("fileExtension",fileExtension)
+            '''
+            if (fileExtension != ".m"):
+                sublime.status_message(filenm + fileExtension + ' is not a Mumps *.m file')
+                return
+            prompt = prompt +":" + filenm
+            '''
+            print("prmpt")
+            print(prompt)
+            '''
+        win = self.view.window()
         win.show_input_panel("Enter <site:action:routine name> ",
                              prompt, self.on_done, None, None)
 
@@ -151,47 +241,39 @@ class meditCommand(sublime_plugin.TextCommand):
             # <=============  save routine to VistA =================>
             sublime.status_message("Saving... ^" + rtn + " to VistA")
             # test code to print out
-            '''
-            print("argvs: ", meaction, rtn, host, context, brokerport,
-                  accesscode, verifycode)
-            print("python" + " " + meditrpc + " " + meaction + " " + rtn +
-                  " " + host + " " + context + " " + brokerport + " " +
-                  accesscode + " " + verifycode + " " + rtnpath)
 
-            # test code end
-            print('cmd: ')
-            '''
             cmd = ["python" + " " + meditrpc + " " + meaction + " " + rtn +
                    " " + host + " " + context + " " + brokerport + " " +
                    accesscode + " " + verifycode + " " + rtnpath]
             print(cmd)
 
             win = self.view.window()
-            maction = 'Saving....'
-            maction_end = 'Saved!'
+            maction = host + ': ' + rtn + ' -> Saving.... '
+            maction_end = host + ': ' + rtn + ' -> Saved!'
             thread = ThreadExecute(cmd, maction, win)
             thread.start()
-            threadcheck.ThreadProgressTracker(thread, maction, maction_end)
+            ThreadProgressTracker(thread, maction, maction_end)
 
         elif meaction == 'L':
             # load a routine from VistA
             print(' loading ---> ' + meditrpc)
             sublime.status_message("Loading... ^" + rtn + " from " + host)
             #
-            print(" L : argvs: " + meditrpc, meaction, rtn, host, context,
-                  brokerport, accesscode, verifycode)
+            # print(" L : argvs: " + meditrpc, meaction, rtn, host, context,
+            #      brokerport, accesscode, verifycode)
 
             cmd = ["python" + " " + meditrpc + " " +
                    meaction + " " + rtn + " " + host + " " + context + " " +
                    brokerport + " " + accesscode + " " + verifycode + " " +
                    rtnpath]
 
+            print("load cmd: ", cmd)
             win = self.view.window()
-            maction = 'Loading....'
-            maction_end = 'Routine loaded!'
+            maction = host + ': ' + rtn + ' -> Loading....'
+            maction_end = host + ': ' + rtn + ' -> Routine loaded!'
             thread = ThreadExecute(cmd, maction, win)
             thread.start()
-            threadcheck.ThreadProgressTracker(thread, maction, maction_end)
+            ThreadProgressTracker(thread, maction, maction_end)
 
     def readconfigjs(self, node):
         # read json file
@@ -221,6 +303,21 @@ class meditCommand(sublime_plugin.TextCommand):
             # print(server_config)
         return server_config
 
+
+    def getnodedata(self, node, configjs):
+        server_config = '0'
+        if configjs is not None:
+            #
+            # load the right configuration from the passed in node
+            #
+            server_config = {
+                "context": configjs["context"]["menuoption"],
+                "host": configjs[node]["host"],
+                "brokerport": configjs[node]["brokerport"],
+                "accesscode": configjs[node]["accesscode"],
+                "verifycode": configjs[node]["verifycode"]
+            }
+        return server_config
 
 class ThreadExecute(threading.Thread):
     def __init__(self, cmd, action, win):
